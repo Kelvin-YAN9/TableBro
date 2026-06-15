@@ -107,7 +107,7 @@
 
 ```bash
 git clone https://github.com/Kelvin-YAN9/TableBro.git
-cd dingtalk-bot-gateway
+cd TableBro
 npm install
 ```
 
