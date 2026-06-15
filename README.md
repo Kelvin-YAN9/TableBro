@@ -106,7 +106,7 @@
 ### 1. 克隆并安装
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Kelvin-YAN9/TableBro.git
 cd dingtalk-bot-gateway
 npm install
 ```
