@@ -1,0 +1,37 @@
+{
+  "name": "dingtalk-bot-gateway",
+  "version": "1.0.0",
+  "description": "DingTalk bot gateway with AI backend integration via Stream mode",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "ts-node-dev --respawn src/index.ts"
+  },
+  "keywords": [
+    "dingtalk",
+    "bot",
+    "ai",
+    "stream",
+    "claude"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dingtalk-stream": "^2.1.5",
+    "openai": "^4.0.0",
+    "pino": "^8.0.0",
+    "pino-pretty": "^10.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "ts-node-dev": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
