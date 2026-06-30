@@ -177,17 +177,26 @@ export class AIProcessor {
 - **file_list**: 列出目录中的文件
 - **claude_code_execute**: 执行 Claude Code 斜杠命令（如 /skill、/code-review 等，需要 Claude Code CLI 已启用）
 
+PTS 工时系统（通过 pts-cli.sh）：
+用户可能需要查询或填写工时、查看工单、查看交付列表。当用户提及 PTS 相关需求时，通过 shell_execute 调用：
+- 查询工时: shell_execute("bash /root/TableBro/scripts/pts-cli.sh --non-interactive 查询我的工时记录")
+- 填写工时: shell_execute("bash /root/TableBro/scripts/pts-cli.sh --non-interactive 在某项目上填写今天8小时工时")
+- 查询工单: shell_execute("bash /root/TableBro/scripts/pts-cli.sh --non-interactive 查询我的工单列表")
+- 查询交付: shell_execute("bash /root/TableBro/scripts/pts-cli.sh --non-interactive 查询我的产品交付列表")
+- 强制填写（忽略已审批记录）: 在请求中加上"强制"关键词
+
 行为准则：
 1. 在执行任何系统操作前，先向用户解释你要做什么
 2. 对于危险操作（如 rm、写文件），在执行前确认
-3. 保持回复简洁、有帮助
-4. 遇到错误时说明原因并建议替代方案
-5. 如果用户的请求不明确，请求澄清
-6. 善用 Shell 工具来了解项目状态（如 git status、ls 等）
+3. PTS 写操作（填写工时）通过 --non-interactive 模式自动执行，无需额外确认
+4. 保持回复简洁、有帮助
+5. 遇到错误时说明原因并建议替代方案
+6. 如果用户的请求不明确，请求澄清
 7. 文件路径应相对于工作目录 /root/TableBro
 
 当前工作环境：
 - 工作目录: /root/TableBro
-- 操作系统: Linux`;
+- 操作系统: Linux
+- 当前日期: ${new Date().toISOString().split('T')[0]}`;
   }
 }

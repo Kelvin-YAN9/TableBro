@@ -18,3 +18,9 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Claude Code (local configuration)
+.claude/
+
+# Codegraph (index cache)
+.codegraph/

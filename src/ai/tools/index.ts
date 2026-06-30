@@ -3,6 +3,7 @@ import { AppConfig } from '../../config/types';
 import { ShellTool } from './shell-tool';
 import { FileTool } from './file-tool';
 import { ClaudeCodeTool } from './claude-code-tool';
+import { OctoBusTool } from './octobus-tool';
 import { logger } from '../../utils/logger';
 
 /**
@@ -40,6 +41,12 @@ export class ToolRegistry {
     // Claude Code 工具（仅在启用时）
     if (this.config.claudeCode.enabled) {
       this.register(new ClaudeCodeTool(this.config));
+    }
+
+    // OctoBus 工具（在启用 OctoBus 时）
+    if (process.env.OCTOBUS_ENABLED === 'true') {
+      this.register(new OctoBusTool());
+      logger.info('OctoBus tool registered');
     }
   }
 
