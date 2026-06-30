@@ -82,6 +82,27 @@ export class MessageHandler {
       // 获取会话历史
       const history = this.getConversationHistory(message.conversationId);
 
+      // 判断是否使用卡片消息
+      const enableCard = this.config.dingtalk.enableCardMessage && !!this.config.dingtalk.templateId;
+
+      let cardMessageId: string | undefined;
+
+      // 如果启用卡片，先发送占位消息"正在思考..."
+      if (enableCard && message.content.length > 100) {
+        try {
+          cardMessageId = await this.sendCardReply(
+            message.sessionWebhook,
+            message.conversationId,
+            '🤔 正在思考...',
+            undefined,
+            { senderId: message.senderId }
+          );
+        } catch (error) {
+          logger.warn('Failed to send thinking card, will send direct reply', { error });
+          cardMessageId = undefined;
+        }
+      }
+
       // AI 处理
       const result = await this.aiProcessor.processMessage({
         message: message.content,
@@ -107,29 +128,39 @@ export class MessageHandler {
         timestamp: Date.now(),
       });
 
-      // 构建回复 - 如果结果太长，使用 markdown 或卡片
-      const enableCard = this.config.dingtalk.enableCardMessage && !!this.config.dingtalk.templateId;
-
-      if (enableCard && result.text.length > 500) {
-        // 长内容 + 卡片启用 → 使用卡片消息
-        await this.sendCardReply(message.sessionWebhook, message.conversationId, result.text, {
-          card: {
-            // 可以添加额外的卡片内容配置
-          },
-          msgParam: {
-            // 可以添加额外的消息参数
-          },
-        }, { senderId: message.senderId });
-      } else if (result.text.length > 200) {
-        // 长内容 → 使用 Markdown
-        await this.sendMarkdownReply(message.sessionWebhook, result.text, {
-          senderId: message.senderId,
-        });
+      // 构建回复 - 优先更新已发送的卡片，否则直接发送
+      if (cardMessageId) {
+        // 已发送占位卡片，更新为实际内容
+        await this.updateCardMessage(cardMessageId, result.text);
       } else {
-        // 短内容 → 使用文本
-        await this.sendReply(message.sessionWebhook, result.text, {
-          senderId: message.senderId,
-        });
+        // 直接发送回复
+        if (enableCard && result.text.length > 500) {
+          // 长内容 + 卡片启用 → 使用卡片消息
+          await this.sendCardReply(
+            message.sessionWebhook,
+            message.conversationId,
+            result.text,
+            {
+              card: {
+                // 可以添加额外的卡片内容配置
+              },
+              msgParam: {
+                // 可以添加额外的消息参数
+              },
+            },
+            { senderId: message.senderId }
+          );
+        } else if (result.text.length > 200) {
+          // 长内容 → 使用 Markdown
+          await this.sendMarkdownReply(message.sessionWebhook, result.text, {
+            senderId: message.senderId,
+          });
+        } else {
+          // 短内容 → 使用文本
+          await this.sendReply(message.sessionWebhook, result.text, {
+            senderId: message.senderId,
+          });
+        }
       }
 
       // 如果有工具调用，附加简要摘要
@@ -262,6 +293,7 @@ export class MessageHandler {
    * @param content 消息内容
    * @param cardData 卡片模板数据（动态变量）
    * @param at 是否 @ 用户
+   * @returns 消息 ID（用于后续更新）
    */
   private async sendCardReply(
     sessionWebhook: string,
@@ -269,15 +301,15 @@ export class MessageHandler {
     content: string,
     cardData?: Record<string, any>,
     at?: { senderId?: string }
-  ): Promise<void> {
-    if (!sessionWebhook) return;
+  ): Promise<string | undefined> {
+    if (!sessionWebhook) return undefined;
 
     const templateId = cardData?.templateId || this.config.dingtalk.templateId;
     if (!templateId) {
       // 如果没有模板 ID，回退到 Markdown
       logger.warn('No template ID available, falling back to markdown');
       await this.sendMarkdownReply(sessionWebhook, content, at);
-      return;
+      return undefined;
     }
 
     const accessToken = await this.dingtalkClient.getAccessToken();
@@ -338,11 +370,63 @@ export class MessageHandler {
       });
       // API 失败，尝试使用 sessionWebhook 发送 Markdown
       await this.sendMarkdownReply(sessionWebhook, content, at);
+      return undefined;
     } else {
-      const responseData = await response.json();
+      const responseData = await response.json() as { messageId?: string; msgId?: string };
       logger.info('Card message sent successfully', {
         templateId,
         response: responseData,
+      });
+      // 返回消息 ID
+      return responseData.messageId || responseData.msgId || undefined;
+    }
+  }
+
+  /**
+   * 更新卡片消息内容
+   * @param messageId 消息 ID
+   * @param content 新的卡片内容
+   */
+  private async updateCardMessage(messageId: string, content: string): Promise<void> {
+    try {
+      const accessToken = await this.dingtalkClient.getAccessToken();
+
+      const updateBody = {
+        messageId: messageId,
+        card: {
+          content: {
+            tag: 'div',
+            text: {
+              tag: 'lark_md',
+              content: content,
+            },
+          },
+        },
+      };
+
+      const response = await fetch('https://api.dingtalk.com/v1.0/im/messages/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-acs-dingtalk-access-token': accessToken,
+        },
+        body: JSON.stringify(updateBody),
+      });
+
+      if (!response.ok) {
+        const respText = await response.text();
+        logger.warn('Failed to update card message', {
+          messageId,
+          status: response.status,
+          error: respText,
+        });
+      } else {
+        logger.info('Card message updated successfully', { messageId });
+      }
+    } catch (error) {
+      logger.error('Error updating card message', {
+        messageId,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
