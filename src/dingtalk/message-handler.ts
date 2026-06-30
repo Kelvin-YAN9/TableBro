@@ -110,7 +110,7 @@ export class MessageHandler {
       // 构建回复 - 如果结果太长，使用 markdown 或卡片
       const enableCard = this.config.dingtalk.enableCardMessage && !!this.config.dingtalk.templateId;
 
-      if (enableCard && result.text.length > 200) {
+      if (enableCard && result.text.length > 500) {
         // 长内容 + 卡片启用 → 使用卡片消息
         await this.sendCardReply(message.sessionWebhook, message.conversationId, result.text, {
           card: {
@@ -120,7 +120,7 @@ export class MessageHandler {
             // 可以添加额外的消息参数
           },
         }, { senderId: message.senderId });
-      } else if (result.text.length > 500) {
+      } else if (result.text.length > 200) {
         // 长内容 → 使用 Markdown
         await this.sendMarkdownReply(message.sessionWebhook, result.text, {
           senderId: message.senderId,
@@ -339,7 +339,11 @@ export class MessageHandler {
       // API 失败，尝试使用 sessionWebhook 发送 Markdown
       await this.sendMarkdownReply(sessionWebhook, content, at);
     } else {
-      logger.info('Card message sent successfully', { templateId });
+      const responseData = await response.json();
+      logger.info('Card message sent successfully', {
+        templateId,
+        response: responseData,
+      });
     }
   }
 
