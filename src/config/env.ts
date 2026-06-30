@@ -44,6 +44,8 @@ function optionalBool(key: string, defaultValue: boolean): boolean {
 export interface Env {
   DINGTALK_CLIENT_ID: string;
   DINGTALK_CLIENT_SECRET: string;
+  DINGTALK_TEMPLATE_ID: string;
+  DINGTALK_ENABLE_CARD_MESSAGE: string;
   AI_BASE_URL: string;
   AI_API_KEY: string;
   AI_MODEL: string;
@@ -65,6 +67,8 @@ export function loadEnv(): Env {
   return {
     DINGTALK_CLIENT_ID: required('DINGTALK_CLIENT_ID'),
     DINGTALK_CLIENT_SECRET: required('DINGTALK_CLIENT_SECRET'),
+    DINGTALK_TEMPLATE_ID: optional('DINGTALK_TEMPLATE_ID', ''),
+    DINGTALK_ENABLE_CARD_MESSAGE: optional('DINGTALK_ENABLE_CARD_MESSAGE', 'false'),
     AI_BASE_URL: required('AI_BASE_URL'),
     AI_API_KEY: required('AI_API_KEY'),
     AI_MODEL: optional('AI_MODEL', 'gpt-4o'),

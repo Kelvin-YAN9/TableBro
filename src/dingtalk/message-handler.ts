@@ -2,6 +2,7 @@ import { DingTalkClient } from './client';
 import { AIProcessor } from '../ai/client';
 import { DingTalkMessage, DingTalkReplyBody } from '../types';
 import { logger } from '../utils/logger';
+import { AppConfig } from '../config/types';
 
 /**
  * 会话历史缓存
@@ -18,14 +19,16 @@ interface ConversationEntry {
 export class MessageHandler {
   private dingtalkClient: DingTalkClient;
   private aiProcessor: AIProcessor;
+  private config: AppConfig;
   /** 会话缓存: conversationId → 消息历史 */
   private conversationCache: Map<string, ConversationEntry[]>;
   /** 最大会话历史条数 */
   private maxHistorySize: number = 20;
 
-  constructor(dingtalkClient: DingTalkClient, aiProcessor: AIProcessor) {
+  constructor(dingtalkClient: DingTalkClient, aiProcessor: AIProcessor, config: AppConfig) {
     this.dingtalkClient = dingtalkClient;
     this.aiProcessor = aiProcessor;
+    this.config = config;
     this.conversationCache = new Map();
   }
 
@@ -33,8 +36,6 @@ export class MessageHandler {
    * 初始化消息监听
    */
   initialize(): void {
-    const TOPIC_ROBOT = '1.0';
-
     this.dingtalkClient.registerCallback(async (event: any) => {
       await this.handleMessage(event);
     });
@@ -111,12 +112,25 @@ export class MessageHandler {
         timestamp: Date.now(),
       });
 
-      // 构建回复 - 如果结果太长，使用 markdown
-      if (result.text.length > 500) {
+      // 构建回复 - 如果结果太长，使用 markdown 或卡片
+      const enableCard = this.config.dingtalk.enableCardMessage && !!this.config.dingtalk.templateId;
+
+      if (enableCard && result.text.length > 200) {
+        // 长内容 + 卡片启用 → 使用卡片消息
+        await this.sendCardReply(message.sessionWebhook, result.text, {
+          i18n_data: {
+            zh_CN: {
+              // 可以添加更多动态变量
+            },
+          },
+        }, { senderId: message.senderId });
+      } else if (result.text.length > 500) {
+        // 长内容 → 使用 Markdown
         await this.sendMarkdownReply(message.sessionWebhook, result.text, {
           senderId: message.senderId,
         });
       } else {
+        // 短内容 → 使用文本
         await this.sendReply(message.sessionWebhook, result.text, {
           senderId: message.senderId,
         });
@@ -242,6 +256,88 @@ export class MessageHandler {
       const respText = await response.text();
       logger.warn('Markdown reply failed, falling back to text', { status: response.status, error: respText });
       await this.sendReply(sessionWebhook, content, at);
+    }
+  }
+
+  /**
+   * 发送卡片模板回复
+   * @param sessionWebhook 会话 webhook URL
+   * @param content 消息内容
+   * @param cardData 卡片模板数据（动态变量）
+   * @param at 是否 @ 用户
+   */
+  private async sendCardReply(
+    sessionWebhook: string,
+    content: string,
+    cardData?: Record<string, any>,
+    at?: { senderId?: string }
+  ): Promise<void> {
+    if (!sessionWebhook) return;
+
+    const templateId = cardData?.templateId || this.config.dingtalk.templateId;
+    if (!templateId) {
+      // 如果没有模板 ID，回退到 Markdown
+      logger.warn('No template ID available, falling back to markdown');
+      await this.sendMarkdownReply(sessionWebhook, content, at);
+      return;
+    }
+
+    // 构建卡片消息体
+    const body: DingTalkReplyBody = {
+      msgtype: 'interactive',
+      interactive: {
+        card: {
+          version: '1.0',
+          config: {
+            wideScreenMode: true,
+          },
+          header: {
+            title: {
+              tag: 'plain_text',
+              content: 'AI 助手',
+            },
+            template: templateId,
+          },
+          // 动态内容
+          i18n_data: {
+            en_US: {
+              card_content: content,
+              ...(cardData?.i18n_data?.en_US || {}),
+            },
+            zh_CN: {
+              card_content: content,
+              ...(cardData?.i18n_data?.zh_CN || {}),
+            },
+          },
+        },
+      },
+    };
+
+    if (at?.senderId) {
+      body.at = {
+        atUserIds: [at.senderId],
+        isAtAll: false,
+      };
+    }
+
+    const accessToken = await this.dingtalkClient.getAccessToken();
+
+    const response = await fetch(sessionWebhook, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-acs-dingtalk-access-token': accessToken,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const respText = await response.text();
+      logger.warn('Card reply failed, falling back to markdown', {
+        status: response.status,
+        error: respText,
+      });
+      await this.sendMarkdownReply(sessionWebhook, content, at);
     }
   }
 

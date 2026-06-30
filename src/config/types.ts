@@ -5,6 +5,10 @@
 export interface DingTalkConfig {
   clientId: string;
   clientSecret: string;
+  // 卡片模板 ID（可选）
+  templateId?: string;
+  // 是否启用卡片消息（默认 false，保持向后兼容）
+  enableCardMessage?: boolean;
 }
 
 export interface AIConfig {

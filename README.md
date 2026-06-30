@@ -132,9 +132,37 @@ pm2 startup  # 按提示执行
 |---|---|---|
 | `DINGTALK_CLIENT_ID` | ✅ | 钉钉应用 AppKey |
 | `DINGTALK_CLIENT_SECRET` | ✅ | 钉钉应用 AppSecret |
+| `DINGTALK_TEMPLATE_ID` | ❌ | 钉钉卡片模板 ID（可选） |
+| `DINGTALK_ENABLE_CARD_MESSAGE` | ❌ | 是否启用卡片消息（默认: false） |
 | `AI_BASE_URL` | ✅ | AI API 地址（OpenAI 兼容） |
 | `AI_API_KEY` | ✅ | AI API 密钥 |
 | `AI_MODEL` | ❌ | 模型名称（默认: gpt-4o） |
+
+### 卡片模板配置（可选）
+
+项目支持钉钉交互式卡片模板，提供更丰富的消息展示形式。
+
+**配置步骤：**
+
+1. 访问 [钉钉开放平台](https://open-dev.dingtalk.com/) → 应用开发 → 企业内部应用
+2. 进入「卡片管理」→「卡片模板」→「创建模板」
+3. 设计卡片布局，定义动态变量（如 `card_content`）
+4. 提交审核通过后，获取**模板 ID**
+5. 在 `.env` 中配置：
+
+```bash
+# 启用卡片消息
+DINGTALK_ENABLE_CARD_MESSAGE=true
+# 填入卡片模板 ID
+DINGTALK_TEMPLATE_ID=dtp_xxxxxxxxxx
+```
+
+**消息类型选择逻辑：**
+- 长内容（>200字符）+ 卡片启用 → 使用卡片消息
+- 长内容（>500字符）+ 卡片禁用 → 使用 Markdown 消息
+- 短内容（≤500字符） → 使用文本消息
+
+**卡片发送失败时自动回退到 Markdown 消息。**
 
 ### AI 后端配置示例
 
@@ -183,6 +211,7 @@ CLAUDE_CODE_PATH=/usr/local/bin/claude
 | 📄 **文件操作** | 读取、写入、列出文件 |
 | 🔧 **Claude Code** | 调用 `/code-review`、`/skill` 等技能 |
 | 🗨️ **多轮对话** | 会话级上下文记忆 |
+| 🎴 **卡片模板** | 支持钉钉交互式卡片模板（可选） |
 | 🔒 **安全机制** | 命令白名单、路径隔离、超时控制 |
 
 ### 支持的工具

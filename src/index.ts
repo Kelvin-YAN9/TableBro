@@ -26,7 +26,7 @@ async function main() {
     const dingtalkClient = new DingTalkClient(config);
 
     // 初始化消息处理器
-    const messageHandler = new MessageHandler(dingtalkClient, aiProcessor);
+    const messageHandler = new MessageHandler(dingtalkClient, aiProcessor, config);
     messageHandler.initialize();
     logger.info('📨 Message handler initialized');
 

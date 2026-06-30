@@ -10,6 +10,8 @@ export function loadConfig(): AppConfig {
       dingtalk: {
         clientId: env.DINGTALK_CLIENT_ID,
         clientSecret: env.DINGTALK_CLIENT_SECRET,
+        templateId: env.DINGTALK_TEMPLATE_ID || undefined,
+        enableCardMessage: env.DINGTALK_ENABLE_CARD_MESSAGE === 'true',
       },
       ai: {
         baseUrl: env.AI_BASE_URL,
