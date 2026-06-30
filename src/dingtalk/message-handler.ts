@@ -117,11 +117,12 @@ export class MessageHandler {
 
       if (enableCard && result.text.length > 200) {
         // 长内容 + 卡片启用 → 使用卡片消息
-        await this.sendCardReply(message.sessionWebhook, result.text, {
-          i18n_data: {
-            zh_CN: {
-              // 可以添加更多动态变量
-            },
+        await this.sendCardReply(message.sessionWebhook, message.conversationId, result.text, {
+          card: {
+            // 可以添加额外的卡片内容配置
+          },
+          msgParam: {
+            // 可以添加额外的消息参数
           },
         }, { senderId: message.senderId });
       } else if (result.text.length > 500) {
@@ -262,12 +263,14 @@ export class MessageHandler {
   /**
    * 发送卡片模板回复
    * @param sessionWebhook 会话 webhook URL
+   * @param conversationId 会话 ID
    * @param content 消息内容
    * @param cardData 卡片模板数据（动态变量）
    * @param at 是否 @ 用户
    */
   private async sendCardReply(
     sessionWebhook: string,
+    conversationId: string,
     content: string,
     cardData?: Record<string, any>,
     at?: { senderId?: string }
@@ -282,10 +285,12 @@ export class MessageHandler {
       return;
     }
 
-    // 构建卡片消息体
-    const body: DingTalkReplyBody = {
-      msgtype: 'interactive',
-      interactive: {
+    const accessToken = await this.dingtalkClient.getAccessToken();
+
+    // 使用钉钉消息发送 API 发送卡片模板消息
+    const cardBody = {
+      msgKey: 'card.interactive',
+      msg: {
         card: {
           version: '1.0',
           config: {
@@ -299,45 +304,47 @@ export class MessageHandler {
             template: templateId,
           },
           // 动态内容
-          i18n_data: {
-            en_US: {
-              card_content: content,
-              ...(cardData?.i18n_data?.en_US || {}),
-            },
-            zh_CN: {
-              card_content: content,
-              ...(cardData?.i18n_data?.zh_CN || {}),
+          content: {
+            tag: 'div',
+            text: {
+              tag: 'lark_md',
+              content: content,
             },
           },
+          ...(cardData?.card || {}),
         },
+      },
+      msgParam: {
+        conversationId: conversationId,
+        ...(cardData?.msgParam || {}),
       },
     };
 
+    // 如果需要 @ 用户
     if (at?.senderId) {
-      body.at = {
-        atUserIds: [at.senderId],
-        isAtAll: false,
-      };
+      cardBody.msgParam['atUserIds'] = [at.senderId];
+      cardBody.msgParam['atAll'] = false;
     }
 
-    const accessToken = await this.dingtalkClient.getAccessToken();
-
-    const response = await fetch(sessionWebhook, {
+    const response = await fetch('https://api.dingtalk.com/v1.0/im/messages/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-acs-dingtalk-access-token': accessToken,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(cardBody),
     });
 
     if (!response.ok) {
       const respText = await response.text();
-      logger.warn('Card reply failed, falling back to markdown', {
+      logger.warn('Card reply failed via API, falling back to markdown', {
         status: response.status,
         error: respText,
       });
+      // API 失败，尝试使用 sessionWebhook 发送 Markdown
       await this.sendMarkdownReply(sessionWebhook, content, at);
+    } else {
+      logger.info('Card message sent successfully', { templateId });
     }
   }
 
