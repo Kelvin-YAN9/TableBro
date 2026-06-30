@@ -79,11 +79,6 @@ export class MessageHandler {
         contentPreview: message.content.substring(0, 50),
       });
 
-      // 回复一个确认消息，让用户知道正在处理
-      await this.sendReply(message.sessionWebhook, '正在思考...', {
-        senderId: message.senderId,
-      });
-
       // 获取会话历史
       const history = this.getConversationHistory(message.conversationId);
 
